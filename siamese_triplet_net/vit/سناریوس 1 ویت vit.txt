@@ -1,0 +1,62 @@
+from transformers import ViTModel, ViTFeatureExtractor
+import torch
+import torch.nn as nn
+from dataloaders import get_train_transforms, get_val_transforms, get_triplet_dataloader
+from losses import TripletLoss
+from trainer import fit
+
+class MobileNetEmbeddingNet(nn.Module):
+    def __init__(self):
+        super(MobileNetEmbeddingNet, self).__init__()
+        self.mobilenet = torchvision.models.mobilenet_v2(pretrained=True)
+        self.mobilenet.classifier = nn.Sequential(
+            nn.Linear(self.mobilenet.last_channel, 256)
+        )
+
+    def forward(self, x):
+        x = self.mobilenet(x)
+        return x
+
+class ViTEmbeddingNet(nn.Module):
+    def __init__(self):
+        super(ViTEmbeddingNet, self).__init__()
+        self.vit = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
+        self.fc = nn.Linear(768, 256)  # Adjust the output size if needed
+
+    def forward(self, x):
+        outputs = self.vit(x)
+        x = outputs.last_hidden_state[:, 0, :]
+        x = self.fc(x)
+        return x
+
+class CombinedEmbeddingNet(nn.Module):
+    def __init__(self):
+        super(CombinedEmbeddingNet, self).__init__()
+        self.mobilenet = MobileNetEmbeddingNet()
+        self.vit = ViTEmbeddingNet()
+
+    def forward(self, x):
+        x_mobilenet = self.mobilenet(x)
+        x_vit = self.vit(x)
+        x_combined = torch.cat((x_mobilenet, x_vit), dim=1)
+        return x_combined
+
+class TripletNet(nn.Module):
+    def __init__(self, embedding_net):
+        super(TripletNet, self).__init__()
+        self.embedding_net = embedding_net
+
+    def forward(self, x1, x2, x3):
+        output1 = self.embedding_net(x1)
+        output2 = self.embedding_net(x2)
+        output3 = self.embedding_net(x3)
+        return output1, output2, output3
+
+    def get_embedding(self, x):
+        return self.embedding_net(x)
+
+# استفاده از MobileNet و ViT به عنوان شبکه تعبیه‌سازی
+embedding_net = CombinedEmbeddingNet()
+model = TripletNet(embedding_net=embedding_net)
+
+# ادامه

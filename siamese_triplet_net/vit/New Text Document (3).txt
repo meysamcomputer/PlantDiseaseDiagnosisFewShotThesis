@@ -1,0 +1,21 @@
+ 
+!pip install transformers
+ 
+
+from transformers import ViTModel, ViTFeatureExtractor
+
+class ViTEmbeddingNet(nn.Module):
+    def __init__(self):
+        super(ViTEmbeddingNet, self).__init__()
+        self.vit = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
+        self.fc = nn.Linear(768, 256)  # Adjust the output size if needed
+
+    def forward(self, x):
+        outputs = self.vit(x)
+        x = outputs.last_hidden_state[:, 0, :]
+        x = self.fc(x)
+        return x
+
+# استفاده از ViT به عنوان شبکه تعبیه‌سازی
+embedding_net = ViTEmbeddingNet()
+model = TripletNet(embedding_net=embedding_net)
